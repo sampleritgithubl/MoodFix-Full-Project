@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.innerly.app.R;
 import com.innerly.app.data.DatabaseHelper;
 import com.innerly.app.utils.SessionManager;
-import com.innerly.app.utils.PasswordUtils; // PasswordUtils import කරන්න
+import com.innerly.app.utils.PasswordUtils; // Import PasswordUtils
 
 public class LoginActivity extends AppCompatActivity {
 
@@ -40,8 +40,8 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            // 2. Password එක Hash කිරීම (Guideline 4.1 අනුව)
-            // පරිශීලකයා ලොග් වීමේදී ලබාදෙන මුරපදය Hash කර එය DB එකේ ඇති Hash එක සමඟ සැසඳිය යුතුය
+            // 2. Hash the input password (According to Guideline 4.1)
+            // The password provided during login must be hashed to compare with the hash in the DB
             String hashedInput = PasswordUtils.hashPassword(password);
 
             if (hashedInput == null) {
@@ -49,17 +49,17 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            // 3. SQLite Database එකෙන් User පරීක්ෂා කිරීම (Hashed Password එක භාවිතා කරමින්)
+            // 3. Check User in SQLite Database (Using Hashed Password)
             int userId = dbHelper.checkUser(email, hashedInput);
 
             if (userId != -1) {
-                // Login සාර්ථකයි නම් Session එක update කර Home එකට යන්න
+                // If Login is successful, update session and go to Home
                 sessionManager.loginUser(userId);
                 Toast.makeText(this, "Login Successful!", Toast.LENGTH_SHORT).show();
                 startActivity(new Intent(LoginActivity.this, HomeActivity.class));
                 finish();
             } else {
-                // දත්ත වැරදි නම් (Email එක හෝ Hashed Password එක වැරදියි)
+                // If credentials are invalid
                 Toast.makeText(this, "Invalid Email or Password", Toast.LENGTH_SHORT).show();
             }
         });
