@@ -2,84 +2,72 @@ package com.innerly.app.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
-
 import androidx.appcompat.app.AppCompatActivity;
-
 import com.innerly.app.R;
-import com.innerly.app.data.AppDatabase;
-import com.innerly.app.data.User;
+import com.innerly.app.data.DatabaseHelper;
 import com.innerly.app.utils.SessionManager;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import com.innerly.app.utils.PasswordUtils; // Import PasswordUtils
 
 public class RegisterActivity extends AppCompatActivity {
+
+    DatabaseHelper dbHelper;
+    SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-        // Database සහ SessionManager සාදා ගැනීම
-        final AppDatabase db = AppDatabase.getDatabase(this);
-        final SessionManager sessionManager = new SessionManager(this);
+        dbHelper = new DatabaseHelper(this);
+        sessionManager = new SessionManager(this);
 
-        // UI කොටස් සම්බන්ධ කිරීම
-        final EditText etName = findViewById(R.id.etName);
         final EditText etEmail = findViewById(R.id.etEmail);
         final EditText etPassword = findViewById(R.id.etPassword);
         final Button btnCreateAccount = findViewById(R.id.btnCreateAccount);
 
-        // "Create Account" බොත්තම ක්ලික් කළ විට
         btnCreateAccount.setOnClickListener(v -> {
-            String name = etName.getText().toString().trim();
             String email = etEmail.getText().toString().trim();
-            String password = etPassword.getText().toString().trim();
+            String rawPassword = etPassword.getText().toString().trim();
 
-            // හිස් දත්ත පරීක්ෂාව
-            if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, R.string.error_fill_fields, Toast.LENGTH_SHORT).show();
+            // 1. Basic Input Validation
+            if (email.isEmpty() || rawPassword.isEmpty()) {
+                Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Database වැඩ සඳහා Background Thread එකක් භාවිතා කිරීම
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Handler handler = new Handler(Looper.getMainLooper());
+            if (rawPassword.length() < 6) {
+                Toast.makeText(this, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            executor.execute(() -> {
-                // 1. දැනටමත් මෙම Email එකෙන් User කෙනෙක් සිටීදැයි බැලීම
-                User existingUser = db.userDao().getUserByEmail(email);
+            // 2. Hash the Password (According to Guideline 4.1)
+            String hashedPassword = PasswordUtils.hashPassword(rawPassword);
 
-                handler.post(() -> {
-                    if (existingUser != null) {
-                        // Email එක දැනටමත් තිබේ නම්
-                        Toast.makeText(RegisterActivity.this, R.string.error_email_exists, Toast.LENGTH_SHORT).show();
-                    } else {
-                        // 2. අලුත් User කෙනෙක් සාදා Database එකට ඇතුළත් කිරීම
-                        executor.execute(() -> {
-                            User newUser = new User();
-                            newUser.setName(name);
-                            newUser.setEmail(email);
-                            newUser.setPassword(password);
+            if (hashedPassword == null) {
+                Toast.makeText(this, "Error processing password", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-                            long userId = db.userDao().insert(newUser);
+            // 3. Register user with Hashed Password
+            boolean isInserted = dbHelper.registerUser(email, hashedPassword);
 
-                            handler.post(() -> {
-                                // 3. සාර්ථකව ඇතුළත් කළ පසු Session එක Update කර Home Screen එකට යෑම
-                                sessionManager.loginUser(userId);
-                                Intent intent = new Intent(RegisterActivity.this, HomeActivity.class);
-                                startActivity(intent);
-                                finish();
-                            });
-                        });
-                    }
-                });
-            });
+            if (isInserted) {
+                Toast.makeText(this, "Registration Successful!", Toast.LENGTH_SHORT).show();
+
+                // Automatically login after registration
+                int userId = dbHelper.checkUser(email, hashedPassword);
+
+                if (userId != -1) {
+                    sessionManager.loginUser(userId);
+                    startActivity(new Intent(RegisterActivity.this, HomeActivity.class));
+                    finish();
+                }
+            } else {
+                Toast.makeText(this, "Registration Failed! Email might already exist.", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 }

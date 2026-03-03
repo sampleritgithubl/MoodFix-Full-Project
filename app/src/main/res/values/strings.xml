@@ -83,4 +83,9 @@
     <string name="error_write_something_mood">Please write something and select a mood</string>
     <string name="goal_created_date">Created %1$s</string>
     <string name="reflection_lessons_learned">What I learned: %1$s</string>
+
+
+
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
 </resources>

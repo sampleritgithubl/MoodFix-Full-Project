@@ -15,13 +15,13 @@ public class Goal {
     private boolean isCompleted;
     private long createdDate;
 
-    // Default Constructor (Room සඳහා අවශ්‍යයි)
+    // Default Constructor (Required for Room)
     public Goal() {
         this.createdDate = System.currentTimeMillis();
         this.isCompleted = false;
     }
 
-    // Getters and Setters (Java වලදී මේවා අනිවාර්යයි)
+    // Getters and Setters (Mandatory in Java)
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
 

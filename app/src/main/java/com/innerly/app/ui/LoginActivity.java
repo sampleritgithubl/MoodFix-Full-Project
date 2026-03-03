@@ -2,73 +2,68 @@ package com.innerly.app.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.innerly.app.R;
-import com.innerly.app.data.AppDatabase;
-import com.innerly.app.data.User;
+import com.innerly.app.data.DatabaseHelper;
 import com.innerly.app.utils.SessionManager;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import com.innerly.app.utils.PasswordUtils; // PasswordUtils import කරන්න
 
 public class LoginActivity extends AppCompatActivity {
+
+    DatabaseHelper dbHelper;
+    SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        // Database සහ SessionManager සාදා ගැනීම
-        final AppDatabase db = AppDatabase.getDatabase(this);
-        final SessionManager sessionManager = new SessionManager(this);
+        dbHelper = new DatabaseHelper(this);
+        sessionManager = new SessionManager(this);
 
-        // UI කොටස් සම්බන්ධ කිරීම
         final EditText etEmail = findViewById(R.id.etEmail);
         final EditText etPassword = findViewById(R.id.etPassword);
         final Button btnLogin = findViewById(R.id.btnLogin);
         final TextView tvCreateAccount = findViewById(R.id.tvCreateAccount);
 
-        // Login බොත්තම ක්ලික් කළ විට
         btnLogin.setOnClickListener(v -> {
             String email = etEmail.getText().toString().trim();
             String password = etPassword.getText().toString().trim();
 
-            // හිස් දත්ත පරීක්ෂාව
+            // 1. Basic Input Validation
             if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, R.string.error_fill_fields, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Database එක පරීක්ෂා කිරීමට Background Thread එකක් භාවිතා කිරීම
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Handler handler = new Handler(Looper.getMainLooper());
+            // 2. Password එක Hash කිරීම (Guideline 4.1 අනුව)
+            // පරිශීලකයා ලොග් වීමේදී ලබාදෙන මුරපදය Hash කර එය DB එකේ ඇති Hash එක සමඟ සැසඳිය යුතුය
+            String hashedInput = PasswordUtils.hashPassword(password);
 
-            executor.execute(() -> {
-                // Email එක මගින් User කෙනෙක් සිටීදැයි බැලීම
-                User user = db.userDao().getUserByEmail(email);
+            if (hashedInput == null) {
+                Toast.makeText(this, "Error processing login", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-                handler.post(() -> {
-                    // Password එක නිවැරදිදැයි බැලීම
-                    if (user != null && user.getPassword().equals(password)) {
-                        // සාර්ථක නම් Session එකේ ID එක තබාගෙන Home Screen එකට යෑම
-                        sessionManager.loginUser(user.getId());
-                        Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
-                        startActivity(intent);
-                        finish();
-                    } else {
-                        // දත්ත වැරදි නම් පණිවිඩයක් පෙන්වීම
-                        Toast.makeText(LoginActivity.this, R.string.error_invalid_credentials, Toast.LENGTH_SHORT).show();
-                    }
-                });
-            });
+            // 3. SQLite Database එකෙන් User පරීක්ෂා කිරීම (Hashed Password එක භාවිතා කරමින්)
+            int userId = dbHelper.checkUser(email, hashedInput);
+
+            if (userId != -1) {
+                // Login සාර්ථකයි නම් Session එක update කර Home එකට යන්න
+                sessionManager.loginUser(userId);
+                Toast.makeText(this, "Login Successful!", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(LoginActivity.this, HomeActivity.class));
+                finish();
+            } else {
+                // දත්ත වැරදි නම් (Email එක හෝ Hashed Password එක වැරදියි)
+                Toast.makeText(this, "Invalid Email or Password", Toast.LENGTH_SHORT).show();
+            }
         });
 
-        // Register Screen එකට යෑම
         tvCreateAccount.setOnClickListener(v -> {
             startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
         });
